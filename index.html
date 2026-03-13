@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">Редактор Игры</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; display: flex; gap: 20px; padding: 20px; background-color: #f4f4f9; color: #333; min-height: 100vh; }
+        .editor, .preview { flex: 1; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); overflow-y: auto; }
+        .editor-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; }
+        h1, h2 { margin: 0; padding: 0; border-bottom: none; }
+        h2 { margin-top: 20px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        label { display: block; margin-top: 15px; font-weight: bold; }
+        input[type="text"], input[type="url"], textarea, select { width: 95%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        textarea { height: 200px; resize: vertical; }
+        .color-inputs { display: flex; gap: 20px; align-items: center; }
+        input[type="color"] { width: 50px; height: 50px; border: none; padding: 0; cursor: pointer; }
+        #generate-btn { width: 100%; padding: 15px; background-color: #007bff; color: white; border: none; border-radius: 5px; font-size: 18px; cursor: pointer; margin-top: 20px; }
+        #generate-btn:hover { background-color: #0056b3; }
+        #lang-toggle { padding: 8px 12px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        #lang-toggle:hover { background-color: #5a6268; }
+        #output-code { font-family: monospace; white-space: pre; background-color: #2d2d2d; color: #f1f1f1; }
+        #preview-container { width: 100%; height: 650px; border: 1px solid #ccc; border-radius: 4px; }
+        .help-text { font-size: 14px; color: #666; margin-top: 5px; background: #f9f9f9; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <div class="editor">
+        <div class="editor-header">
+            <h1 id="editor-title">Редактор Игры</h1>
+            <button id="lang-toggle">EN</button>
+        </div>
+
+        <h2 id="section-appearance">1. Внешний вид</h2>
+        <div class="color-inputs">
+            <div>
+                <label for="bg-color" id="label-bg-color">Цвет фона:</label>
+                <input type="color" id="bg-color" value="#f0f8ff">
+            </div>
+            <div>
+                <label for="btn-color" id="label-btn-color">Цвет кнопок/элементов:</label>
+                <input type="color" id="btn-color" value="#4CAF50">
+            </div>
+        </div>
+        
+        <h2 id="section-game-type">2. Тип игры</h2>
+        <label for="game-type" id="label-game-type">Выберите сложность/тип задания:</label>
+        <select id="game-type">
+            <option value="anagram" id="game-type-anagram">Расставить буквы (легко)</option>
+            <option value="input" id="game-type-input">Впечатать ответ (сложно)</option>
+        </select>
+
+        <h2 id="section-content">3. Содержимое игры</h2>
+        <label for="game-data" id="label-game-data">Вопросы и ответы:</label>
+        <div class="help-text" id="help-text">
+            Каждая строка — один раунд. Формат: <br>
+            <b>Вопрос | Правильный ответ | Ссылка на картинку (необязательно)</b>
+        </div>
+        <textarea id="game-data">Процесс создания растениями органических веществ из неорганических на свету | Фотосинтез | https://i.ibb.co/L5hP9Vj/plant.png
+Столица России | Москва | https://i.ibb.co/hZ2pLzG/moscow.jpg
+Химический элемент с символом 'Fe' | Железо |</textarea>
+
+        <h2 id="section-feedback">4. Обратная связь</h2>
+        <label for="feedback-correct" id="label-feedback-correct">Текст при верном ответе:</label>
+        <input type="text" id="feedback-correct" value="Верно! Отлично!">
+        
+        <label for="feedback-incorrect" id="label-feedback-incorrect">Текст при неверном ответе:</label>
+        <input type="text" id="feedback-incorrect" value="Ошибка, попробуй еще раз.">
+        
+        <label for="feedback-final" id="label-feedback-final">Текст по завершении игры:</label>
+        <input type="text" id="feedback-final" value="Игра окончена! Вы молодец!">
+
+        <button id="generate-btn">Сгенерировать код и обновить превью</button>
+
+        <h2 id="section-code">5. Готовый код</h2>
+        <label for="output-iframe" id="label-output-iframe">Код для вставки на сайт (iframe):</label>
+        <textarea id="output-iframe" readonly></textarea>
+        
+        <label for="output-code" id="label-output-code">Полный HTML-код игры:</label>
+        <textarea id="output-code" readonly></textarea>
+    </div>
+
+    <div class="preview">
+        <h1 id="preview-title">Превью Игры</h1>
+        <iframe id="preview-container" title="Превью игры"></iframe>
+    </div>
+
+<script>
+    // --- Словарь для перевода интерфейса ---
+    const translations = {
+        ru: {
+            pageTitle: 'Универсальный Редактор Игр', editorTitle: 'Редактор Игры', previewTitle: 'Превью Игры',
+            sectionAppearance: '1. Внешний вид', labelBgColor: 'Цвет фона:', labelBtnColor: 'Цвет кнопок/элементов:',
+            sectionGameType: '2. Тип игры', labelGameType: 'Выберите сложность/тип задания:',
+            gameTypeAnagram: 'Расставить буквы (легко)', gameTypeInput: 'Впечатать ответ (сложно)',
+            sectionContent: '3. Содержимое игры', labelGameData: 'Вопросы и ответы:',
+            helpText: 'Каждая строка — раунд. Формат: <br><b>Вопрос | Ответ | Ссылка на картинку (необязательно)</b>',
+            sectionFeedback: '4. Обратная связь', labelFeedbackCorrect: 'Текст при верном ответе:',
+            labelFeedbackIncorrect: 'Текст при неверном ответе:', labelFeedbackFinal: 'Текст по завершении игры:',
+            generateBtn: 'Сгенерировать код и обновить превью', sectionCode: '5. Готовый код',
+            labelOutputIframe: 'Код для вставки на сайт (iframe):', labelOutputCode: 'Полный HTML-код игры:',
+        },
+        en: {
+            pageTitle: 'Universal Game Editor', editorTitle: 'Game Editor', previewTitle: 'Game Preview',
+            sectionAppearance: '1. Appearance', labelBgColor: 'Background Color:', labelBtnColor: 'Buttons/Elements Color:',
+            sectionGameType: '2. Game Type', labelGameType: 'Choose difficulty/task type:',
+            gameTypeAnagram: 'Arrange letters (easy)', gameTypeInput: 'Type the answer (hard)',
+            sectionContent: '3. Game Content', labelGameData: 'Questions and Answers:',
+            helpText: 'Each line is a round. Format: <br><b>Question | Answer | Image URL (optional)</b>',
+            sectionFeedback: '4. Feedback Text', labelFeedbackCorrect: 'Text for correct answer:',
+            labelFeedbackIncorrect: 'Text for incorrect answer:', labelFeedbackFinal: 'Text for game completion:',
+            generateBtn: 'Generate Code & Update Preview', sectionCode: '5. Resulting Code',
+            labelOutputIframe: 'Code for website embedding (iframe):', labelOutputCode: 'Full HTML code of the game:',
+        }
+    };
+
+    let currentLang = 'ru';
+
+    // --- Функция смены языка ---
+    function setLanguage(lang) {
+        currentLang = lang;
+        const t = translations[lang];
+        document.querySelectorAll('[id]').forEach(el => {
+            const key = el.id.replace(/-([a-z])/g, g => g[1].toUpperCase());
+            if (t[key]) {
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = t[key];
+                else el.innerHTML = t[key];
+            }
+        });
+        document.getElementById('lang-toggle').textContent = lang === 'ru' ? 'EN' : 'RU';
+    }
+
+    // --- Элементы управления редактора ---
+    const bgColorInput = document.getElementById('bg-color');
+    const btnColorInput = document.getElementById('btn-color');
+    const gameTypeSelect = document.getElementById('game-type');
+    const gameDataInput = document.getElementById('game-data');
+    const correctFeedbackInput = document.getElementById('feedback-correct');
+    const incorrectFeedbackInput = document.getElementById('feedback-incorrect');
+    const finalFeedbackInput = document.getElementById('feedback-final');
+    const generateBtn = document.getElementById('generate-btn');
+    const langToggleBtn = document.getElementById('lang-toggle');
+    const outputCodeTextarea = document.getElementById('output-code');
+    const outputIframeTextarea = document.getElementById('output-iframe');
+    const previewFrame = document.getElementById('preview-container');
+
+    // --- Функция генерации ---
+    function generateGame() {
+        const bgColor = bgColorInput.value;
+        const btnColor = btnColorInput.value;
+        const gameType = gameTypeSelect.value;
+        const correctFeedback = correctFeedbackInput.value;
+        const incorrectFeedback = incorrectFeedbackInput.value;
+        const finalFeedback = finalFeedbackInput.value;
+
+        const gameDataRaw = gameDataInput.value.trim().split('\n');
+        const gameData = gameDataRaw.map(line => {
+            const parts = line.split('|');
+            if (parts.length < 2 || !parts[0].trim() || !parts[1].trim()) return null;
+            return {
+                definition: parts[0].trim(),
+                answer: parts[1].trim(),
+                imageUrl: parts.length > 2 ? parts[2].trim() : ''
+            };
+        }).filter(item => item !== null);
+        
+        let gameTemplate = '';
+
+        const commonStyles = `
+            body { font-family: sans-serif; background-color: ${bgColor}; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; color: #333; }
+            .container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 15px rgba(0,0,0,0.1); text-align: center; width: 90%; max-width: 600px; }
+            #game-image { max-width: 100%; height: auto; max-height: 150px; border-radius: 8px; margin-bottom: 20px; object-fit: cover; }
+            .definition { font-size: 1.2em; margin-bottom: 20px; }
+            #feedback { margin-top: 20px; font-size: 1.1em; font-weight: bold; min-height: 1.2em; }
+            .correct-feedback { color: #28a745; }
+            .incorrect-feedback { color: #dc3545; }
+        `;
+
+        if (gameType === 'anagram') {
+            gameTemplate = `
+<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Игра: Анаграмма</title>
+<style>
+    ${commonStyles}
+    .answer-display { background: #eee; border-radius: 5px; padding: 15px; min-height: 50px; margin: 20px 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; border: 2px dashed #ccc; }
+    .letter-pool { margin: 20px 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+    .letter-btn { font-size: 1.5em; width: 50px; height: 50px; border: none; border-radius: 5px; background-color: ${btnColor}; color: white; cursor: pointer; transition: all 0.2s; }
+    .letter-btn:hover { transform: scale(1.1); }
+    .letter-btn.placed { background-color: #6c757d; cursor: not-allowed; }
+    .controls { display: flex; gap: 10px; justify-content: center; }
+    .control-btn { padding: 10px 20px; font-size: 1em; border: none; border-radius: 5px; color: white; cursor: pointer; }
+    #check-btn { background-color: #007bff; }
+    #clear-btn { background-color: #ffc107; color: #333; }
+</style></head><body>
+<div class="container">
+    <img id="game-image" src="" alt="">
+    <p class="definition"></p>
+    <div class="answer-display"></div>
+    <div class="letter-pool"></div>
+    <div class="controls">
+        <button id="check-btn" class="control-btn">${currentLang === 'ru' ? 'Проверить' : 'Check'}</button>
+        <button id="clear-btn" class="control-btn">${currentLang === 'ru' ? 'Сброс' : 'Clear'}</button>
+    </div>
+    <p id="feedback"></p>
+</div>
+<script>
+    const gameData = ${JSON.stringify(gameData)};
+    let currentQuestionIndex = 0;
+    const UIElements = {
+        definition: document.querySelector('.definition'),
+        image: document.getElementById('game-image'),
+        answerDisplay: document.querySelector('.answer-display'),
+        letterPool: document.querySelector('.letter-pool'),
+        feedback: document.getElementById('feedback'),
+        checkBtn: document.getElementById('check-btn'),
+        clearBtn: document.getElementById('clear-btn'),
+        controls: document.querySelector('.controls'),
+    };
+
+    function shuffle(array) { return array.sort(() => Math.random() - 0.5); }
+    
+    function loadQuestion() {
+        if (currentQuestionIndex >= gameData.length) {
+            UIElements.definition.textContent = "${finalFeedback}";
+            UIElements.image.style.display = 'none';
+            UIElements.answerDisplay.innerHTML = '';
+            UIElements.letterPool.innerHTML = '';
+            UIElements.controls.style.display = 'none';
+            UIElements.feedback.innerHTML = '';
+            return;
+        }
+        const q = gameData[currentQuestionIndex];
+        UIElements.definition.textContent = q.definition;
+        UIElements.image.style.display = q.imageUrl ? 'block' : 'none';
+        UIElements.image.src = q.imageUrl;
+        UIElements.feedback.textContent = '';
+        UIElements.answerDisplay.innerHTML = '';
+        UIElements.letterPool.innerHTML = '';
+        
+        shuffle([...q.answer.toUpperCase()]).forEach(letter => {
+            const btn = document.createElement('button');
+            btn.className = 'letter-btn';
+            btn.textContent = letter;
+            btn.onclick = () => moveLetter(btn, 'to_answer');
+            UIElements.letterPool.appendChild(btn);
+        });
+    }
+
+    function moveLetter(btn, direction) {
+        if (direction === 'to_answer' && !btn.classList.contains('placed')) {
+            btn.classList.add('placed');
+            const newBtn = btn.cloneNode(true);
+            newBtn.onclick = () => moveLetter(newBtn, 'to_pool');
+            UIElements.answerDisplay.appendChild(newBtn);
+        } else if (direction === 'to_pool') {
+            const originalBtn = Array.from(UIElements.letterPool.children).find(b => b.textContent === btn.textContent && b.classList.contains('placed'));
+            if (originalBtn) originalBtn.classList.remove('placed');
+            btn.remove();
+        }
+    }
+
+    UIElements.clearBtn.onclick = () => {
+        UIElements.answerDisplay.innerHTML = '';
+        UIElements.letterPool.querySelectorAll('.letter-btn').forEach(b => b.classList.remove('placed'));
+    };
+
+    UIElements.checkBtn.onclick = () => {
+        const userAnswer = Array.from(UIElements.answerDisplay.children).map(b => b.textContent).join('');
+        const correctAnswer = gameData[currentQuestionIndex].answer.toUpperCase().replace(/\\s/g, '');
+        if (userAnswer === correctAnswer) {
+            UIElements.feedback.textContent = "${correctFeedback}";
+            UIElements.feedback.className = 'correct-feedback';
+            setTimeout(() => { currentQuestionIndex++; loadQuestion(); }, 1500);
+        } else {
+            UIElements.feedback.textContent = "${incorrectFeedback}";
+            UIElements.feedback.className = 'incorrect-feedback';
+        }
+    };
+    loadQuestion();
+<\/script></body></html>`;
+        } else { // gameType === 'input'
+            gameTemplate = `
+<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Игра: Ввод ответа</title>
+<style>
+    ${commonStyles}
+    #answer-input { width: 80%; padding: 15px; font-size: 1.2em; text-align: center; border: 2px solid #ccc; border-radius: 5px; margin-top: 20px; }
+    #answer-input:focus { border-color: ${btnColor}; outline: none; }
+    #check-btn { padding: 12px 25px; font-size: 1.1em; border: none; border-radius: 5px; color: white; cursor: pointer; background-color: ${btnColor}; margin-top: 20px; }
+</style></head><body>
+<div class="container">
+    <img id="game-image" src="" alt="">
+    <p class="definition"></p>
+    <div id="interactive-area">
+        <input type="text" id="answer-input" placeholder="${currentLang === 'ru' ? 'Введите ответ...' : 'Type answer...'}">
+        <button id="check-btn">${currentLang === 'ru' ? 'Проверить' : 'Check'}</button>
+    </div>
+    <p id="feedback"></p>
+</div>
+<script>
+    const gameData = ${JSON.stringify(gameData)};
+    let currentQuestionIndex = 0;
+    const UIElements = {
+        definition: document.querySelector('.definition'),
+        image: document.getElementById('game-image'),
+        input: document.getElementById('answer-input'),
+        checkBtn: document.getElementById('check-btn'),
+        feedback: document.getElementById('feedback'),
+        interactiveArea: document.getElementById('interactive-area'),
+    };
+    
+    function loadQuestion() {
+        if (currentQuestionIndex >= gameData.length) {
+            UIElements.definition.textContent = "${finalFeedback}";
+            UIElements.image.style.display = 'none';
+            UIElements.interactiveArea.style.display = 'none';
+            UIElements.feedback.innerHTML = '';
+            return;
+        }
+        const q = gameData[currentQuestionIndex];
+        UIElements.definition.textContent = q.definition;
+        UIElements.image.style.display = q.imageUrl ? 'block' : 'none';
+        UIElements.image.src = q.imageUrl;
+        UIElements.input.value = '';
+        UIElements.feedback.textContent = '';
+        UIElements.input.focus();
+    }
+
+    function checkAnswer() {
+        const userAnswer = UIElements.input.value.trim().toLowerCase();
+        const correctAnswer = gameData[currentQuestionIndex].answer.trim().toLowerCase();
+        if (userAnswer === correctAnswer) {
+            UIElements.feedback.textContent = "${correctFeedback}";
+            UIElements.feedback.className = 'correct-feedback';
+            setTimeout(() => { currentQuestionIndex++; loadQuestion(); }, 1500);
+        } else {
+            UIElements.feedback.textContent = "${incorrectFeedback}";
+            UIElements.feedback.className = 'incorrect-feedback';
+        }
+    }
+    
+    UIElements.checkBtn.onclick = checkAnswer;
+    UIElements.input.onkeydown = (e) => { if (e.key === 'Enter') checkAnswer(); };
+    loadQuestion();
+<\/script></body></html>`;
+        }
+
+        outputCodeTextarea.value = gameTemplate.trim();
+        const iframeCode = `<iframe srcdoc="${gameTemplate.replace(/"/g, '&quot;')}" width="100%" height="650" style="border:none;" title="Interactive Game"></iframe>`;
+        outputIframeTextarea.value = iframeCode;
+
+        previewFrame.srcdoc = gameTemplate;
+    }
+
+    // --- Назначение событий ---
+    generateBtn.addEventListener('click', generateGame);
+    langToggleBtn.addEventListener('click', () => {
+        setLanguage(currentLang === 'ru' ? 'en' : 'ru');
+        generateGame(); // Перегенерировать игру, чтобы в ней тоже сменился язык кнопок
+    });
+    gameTypeSelect.addEventListener('change', generateGame);
+
+
+    // --- Первичная генерация и установка языка при загрузке страницы ---
+    window.addEventListener('load', () => {
+        setLanguage('ru');
+        generateGame();
+    });
+</script>
+
+</body>
+</html>
